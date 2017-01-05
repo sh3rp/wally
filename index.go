@@ -41,11 +41,12 @@ func ReadMasterIndex(filename string) (*MasterIndex, error) {
 	return &mi, err
 }
 
-func (mi *MasterIndex) LastIndex() *Index {
+func (mi *MasterIndex) LastIndex() Index {
+	var index Index
 	if len(mi.Indices) == 0 {
-		return nil
+		return index
 	}
-	return &mi.Indices[len(mi.Indices)-1]
+	return mi.Indices[len(mi.Indices)-1]
 }
 
 func (mi *MasterIndex) WriteIndex(index Index) error {
@@ -105,19 +106,28 @@ func (mi *MasterIndex) Write(index Index, data []byte) (Index, error) {
 
 func (mi *MasterIndex) Read(index Index, pos int64) ([]byte, error) {
 	file, err := os.OpenFile(index.BlobFilename, os.O_RDONLY|os.O_CREATE, 0600)
+
 	if err != nil {
 		return nil, err
 	}
-	start, err := file.Seek(index.Records[pos], 0)
-	if err != nil {
-		return nil, err
+
+	var start int64
+	if pos > 0 {
+		start, err = file.Seek(index.Records[pos]-1, 0)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		start = 0
 	}
+
 	var end int64
-	if len(index.Records) < int(pos+1) {
+	if len(index.Records) > int(pos+1) {
 		end, err = file.Seek(index.Records[pos+1], 0)
 		if err != nil {
 			return nil, err
 		}
+		end--
 	} else {
 		stat, err := file.Stat()
 		if err != nil {
@@ -125,6 +135,7 @@ func (mi *MasterIndex) Read(index Index, pos int64) ([]byte, error) {
 		}
 		end = stat.Size()
 	}
+
 	data := make([]byte, end-start)
 	_, err = file.ReadAt(data, start)
 

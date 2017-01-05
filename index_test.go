@@ -40,12 +40,20 @@ func TestIndex(t *testing.T) {
 func TestWrite(t *testing.T) {
 	teardown()
 	mi, idx := setup()
-	idx, err := mi.Write(idx, []byte("This is test data"))
+	idx, err := mi.Write(idx, []byte("Data1"))
+	idx, err = mi.Write(idx, []byte("Data2"))
+	idx, err = mi.Write(idx, []byte("Data3"))
 	assert.Nil(t, err)
 	assert.NotNil(t, idx)
 	data, err := mi.Read(idx, 0)
 	assert.Nil(t, err)
-	assert.True(t, bytes.Equal([]byte("This is test data"), data))
+	assert.True(t, bytes.Equal([]byte("Data1"), data))
+	data, err = mi.Read(idx, 1)
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal([]byte("Data2"), data))
+	data, err = mi.Read(idx, 2)
+	assert.Nil(t, err)
+	assert.True(t, bytes.Equal([]byte("Data3"), data))
 	teardown()
 }
 
