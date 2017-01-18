@@ -39,15 +39,16 @@ func (w *Wally) Write(data []byte) (int, error) {
 func (w *Wally) Peek(idx int64) ([]byte, error) {
 	var index Index
 	curIdx := idx
-	for _, idx := range w.Index.Indices {
-		index = idx
-		if index.StartOffset > curIdx {
+	for _, i := range w.Index.Indices {
+		index = i
+		if index.StartOffset >= curIdx {
 			break
 		} else {
 			curIdx = curIdx - index.StartOffset
 		}
 	}
-	return nil, nil
+
+	return w.Index.Read(index, curIdx)
 }
 
 func (w *Wally) Next() ([]byte, error) {
