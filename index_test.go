@@ -2,6 +2,7 @@ package wally
 
 import (
 	"bytes"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -10,30 +11,32 @@ import (
 
 func TestRWMasterIndex(t *testing.T) {
 	teardown()
-	mi := &MasterIndex{Filename: "/tmp/testMasterIndex"}
-	mi.Indices = append(mi.Indices, Index{Filename: "/tmp/index1.idx"})
+	masterIdxName, idx1Name, _ := getFilenames()
+	mi := &MasterIndex{Filename: masterIdxName}
+	mi.Indices = append(mi.Indices, Index{Filename: idx1Name})
 	err := WriteMasterIndex(mi)
 	assert.Nil(t, err)
 
-	mi, err = ReadMasterIndex("/tmp/testMasterIndex")
+	mi, err = ReadMasterIndex(masterIdxName)
 	assert.Nil(t, err)
 	assert.NotNil(t, mi)
-	assert.Equal(t, "/tmp/index1.idx", mi.Indices[0].Filename)
+	assert.Equal(t, idx1Name, mi.Indices[0].Filename)
 	teardown()
 }
 
 func TestIndex(t *testing.T) {
 	teardown()
-	mi := &MasterIndex{Filename: "/tmp/testMasterIndex"}
-	idx := Index{Filename: "/tmp/test1.idx", BlobFilename: "/tmp/test1.dat", StartOffset: 0}
+	masterIdxName, idx1Name, dat1Name := getFilenames()
+	mi := &MasterIndex{Filename: masterIdxName}
+	idx := Index{Filename: idx1Name, BlobFilename: dat1Name, StartOffset: 0}
 	err := mi.WriteIndex(idx)
-	newMi, err := ReadMasterIndex("/tmp/testMasterIndex")
+	newMi, err := ReadMasterIndex(masterIdxName)
 	assert.Nil(t, err)
 	assert.NotNil(t, newMi)
 	newIdx := newMi.LastIndex()
 	assert.NotNil(t, newIdx)
-	assert.Equal(t, "/tmp/test1.idx", newIdx.Filename)
-	assert.Equal(t, "/tmp/test1.dat", newIdx.BlobFilename)
+	assert.Equal(t, idx1Name, newIdx.Filename)
+	assert.Equal(t, dat1Name, newIdx.BlobFilename)
 	teardown()
 }
 
@@ -58,15 +61,27 @@ func TestWrite(t *testing.T) {
 }
 
 func setup() (*MasterIndex, Index) {
-	mi := &MasterIndex{Filename: "/tmp/testMasterIndex"}
-	idx := Index{Filename: "/tmp/test1.idx", BlobFilename: "/tmp/test1.dat", StartOffset: 0}
+	m, i, d := getFilenames()
+	mi := &MasterIndex{Filename: m}
+	idx := Index{Filename: i, BlobFilename: d, StartOffset: 0}
 	mi.WriteIndex(idx)
 	WriteMasterIndex(mi)
 	return mi, idx
 }
 
+func getFilenames() (string, string, string) {
+	masterIdx, _ := ioutil.TempFile("", "testMasterIndex")
+	masterIdxName := masterIdx.Name()
+	idx1, _ := ioutil.TempFile("", "test1.idx")
+	idx1Name := idx1.Name()
+	dat1, _ := ioutil.TempFile("", "test1.dat")
+	dat1Name := dat1.Name()
+	return masterIdxName, idx1Name, dat1Name
+}
+
 func teardown() {
-	os.Remove("/tmp/testMasterIndex")
-	os.Remove("/tmp/test1.idx")
-	os.Remove("/tmp/test1.dat")
+	m, i, d := getFilenames()
+	os.Remove(m)
+	os.Remove(i)
+	os.Remove(d)
 }

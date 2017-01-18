@@ -3,9 +3,10 @@ package wally
 import "os"
 
 type Wally struct {
-	Name    string
-	BaseDir string
-	Index   *MasterIndex
+	Name         string
+	BaseDir      string
+	Index        *MasterIndex
+	CurrentIndex int64
 }
 
 func NewWally(dir string, name string) *Wally {
@@ -14,7 +15,7 @@ func NewWally(dir string, name string) *Wally {
 	}
 	path := dir + "/" + name + ".mdx"
 	masterIndex := &MasterIndex{Filename: path}
-	return &Wally{Index: masterIndex, Name: name, BaseDir: dir}
+	return &Wally{Index: masterIndex, Name: name, BaseDir: dir, CurrentIndex: 0}
 }
 
 func (w *Wally) Write(data []byte) (int, error) {
@@ -33,4 +34,24 @@ func (w *Wally) Write(data []byte) (int, error) {
 	index, err = w.Index.Write(index, data)
 
 	return len(index.Records), err
+}
+
+func (w *Wally) Peek(idx int64) ([]byte, error) {
+	var index Index
+	curIdx := idx
+	for _, idx := range w.Index.Indices {
+		index = idx
+		if index.StartOffset > curIdx {
+			break
+		} else {
+			curIdx = curIdx - index.StartOffset
+		}
+	}
+	return nil, nil
+}
+
+func (w *Wally) Next() ([]byte, error) {
+	b, e := w.Peek(w.CurrentIndex)
+	w.CurrentIndex++
+	return b, e
 }
