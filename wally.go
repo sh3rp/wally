@@ -7,20 +7,40 @@ import (
 )
 
 const DEFAULT_MAX_DATA_SIZE = 65535
+const DEFAULT_MAX_INDEX_ENTRIES = 5000
 
 type Wally struct {
-	Name         string
-	BaseDir      string
-	Index        *MasterIndex
-	CurrentIndex int64
-	MaxDataSize  int
+	Name            string
+	BaseDir         string
+	Index           *MasterIndex
+	CurrentIndex    int64
+	MaxDataSize     int
+	MaxIndexEntries int
 }
 
-func NewWally(dir string, name string) *Wally {
-	if _, err := os.Stat(dir); err != nil {
-		os.MkdirAll(dir, 0600)
+type WallyConfig struct {
+	BaseDir           string
+	BaseName          string
+	MaxDataSize       int
+	MaxIndexEntries   int
+	MaxEntryRetention int
+}
+
+func DefaultConfig() WallyConfig {
+	return WallyConfig{
+		BaseDir:           ".",
+		BaseName:          "wally",
+		MaxDataSize:       DEFAULT_MAX_DATA_SIZE,
+		MaxIndexEntries:   DEFAULT_MAX_INDEX_ENTRIES,
+		MaxEntryRetention: -1,
 	}
-	path := dir + "/" + name + ".mdx"
+}
+
+func NewWally(config WallyConfig) *Wally {
+	if _, err := os.Stat(config.BaseDir); err != nil {
+		os.MkdirAll(config.BaseDir, 0600)
+	}
+	path := config.BaseDir + "/" + config.BaseName + ".mdx"
 
 	var masterIndex *MasterIndex
 
@@ -30,7 +50,14 @@ func NewWally(dir string, name string) *Wally {
 		masterIndex, err = ReadMasterIndex(path)
 	}
 
-	return &Wally{Index: masterIndex, Name: name, BaseDir: dir, CurrentIndex: 0, MaxDataSize: DEFAULT_MAX_DATA_SIZE}
+	return &Wally{
+		Index:           masterIndex,
+		Name:            config.BaseName,
+		BaseDir:         config.BaseDir,
+		CurrentIndex:    masterIndex.LastIndex().StartOffset,
+		MaxDataSize:     config.MaxDataSize,
+		MaxIndexEntries: config.MaxIndexEntries,
+	}
 }
 
 func (w *Wally) Write(data []byte) (int, error) {
@@ -43,6 +70,8 @@ func (w *Wally) Write(data []byte) (int, error) {
 
 	if index.Filename == "" {
 		index = Index{Filename: w.BaseDir + "/" + w.Name + "-1.idx", BlobFilename: w.BaseDir + "/" + w.Name + "-1.dat"}
+	} else if len(index.Records) >= w.MaxIndexEntries {
+		index = Index{Filename: w.BaseDir + "/" + w.Name + "-" + strconv.Itoa(len(w.Index.Indices)+1) + ".dat"}
 	}
 
 	err := w.Index.WriteIndex(index)

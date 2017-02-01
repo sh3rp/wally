@@ -9,7 +9,10 @@ import (
 )
 
 func TestWallyReadWrite(t *testing.T) {
-	w := NewWally(getDir(), "test")
+	config := DefaultConfig()
+	config.BaseDir = getDir()
+	config.BaseName = "test"
+	w := NewWally(config)
 	w.Write([]byte("testdata1"))
 	w.Write([]byte("testdata2"))
 	w.Write([]byte("testdata3"))
@@ -23,7 +26,10 @@ func TestWallyReadWrite(t *testing.T) {
 }
 
 func TestWallyRandReadWrite(t *testing.T) {
-	w := NewWally(getDir(), "test")
+	config := DefaultConfig()
+	config.BaseDir = getDir()
+	config.BaseName = "test"
+	w := NewWally(config)
 
 	for i := 0; i < 1000; i++ {
 		w.Write([]byte("testdata" + strconv.Itoa(i)))
@@ -37,7 +43,10 @@ func TestWallyRandReadWrite(t *testing.T) {
 }
 
 func TestWallyMaxDataSize(t *testing.T) {
-	w := NewWally(getDir(), "test")
+	config := DefaultConfig()
+	config.BaseDir = getDir()
+	config.BaseName = "test"
+	w := NewWally(config)
 
 	goodData := make([]byte, w.MaxDataSize)
 	goodNumWritten, err := w.Write(goodData)
