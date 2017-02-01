@@ -39,6 +39,11 @@ func TestWallyRandReadWrite(t *testing.T) {
 func TestWallyMaxDataSize(t *testing.T) {
 	w := NewWally(getDir(), "test")
 
+	goodData := make([]byte, w.MaxDataSize)
+	goodNumWritten, err := w.Write(goodData)
+	assert.Equal(t, 1, goodNumWritten)
+	assert.Nil(t, err)
+
 	data := make([]byte, w.MaxDataSize+1)
 	numWritten, err := w.Write(data)
 	assert.Equal(t, 0, numWritten)
