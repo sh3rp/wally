@@ -1,12 +1,19 @@
 package wally
 
-import "os"
+import (
+	"errors"
+	"os"
+	"strconv"
+)
+
+const DEFAULT_MAX_DATA_SIZE = 65535
 
 type Wally struct {
 	Name         string
 	BaseDir      string
 	Index        *MasterIndex
 	CurrentIndex int64
+	MaxDataSize  int
 }
 
 func NewWally(dir string, name string) *Wally {
@@ -15,16 +22,21 @@ func NewWally(dir string, name string) *Wally {
 	}
 	path := dir + "/" + name + ".mdx"
 	masterIndex := &MasterIndex{Filename: path}
-	return &Wally{Index: masterIndex, Name: name, BaseDir: dir, CurrentIndex: 0}
+	return &Wally{Index: masterIndex, Name: name, BaseDir: dir, CurrentIndex: 0, MaxDataSize: DEFAULT_MAX_DATA_SIZE}
 }
 
 func (w *Wally) Write(data []byte) (int, error) {
+	if len(data) > w.MaxDataSize {
+		return 0, errors.New("Max data size (" + strconv.Itoa(w.MaxDataSize) + ") exceeded (" + strconv.Itoa(len(data)) + ")")
+	}
+
 	var index Index
 	index = w.Index.LastIndex()
 
 	if index.Filename == "" {
 		index = Index{Filename: w.BaseDir + "/" + w.Name + "-1.idx", BlobFilename: w.BaseDir + "/" + w.Name + "-1.dat"}
 	}
+
 	err := w.Index.WriteIndex(index)
 
 	if err != nil {

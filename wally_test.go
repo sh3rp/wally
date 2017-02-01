@@ -36,6 +36,15 @@ func TestWallyRandReadWrite(t *testing.T) {
 	assert.Equal(t, p, []byte("testdata0"))
 }
 
+func TestWallyMaxDataSize(t *testing.T) {
+	w := NewWally(getDir(), "test")
+
+	data := make([]byte, w.MaxDataSize+1)
+	numWritten, err := w.Write(data)
+	assert.Equal(t, 0, numWritten)
+	assert.NotNil(t, err)
+}
+
 func getDir() string {
 	dir, _ := ioutil.TempDir("", "tmp")
 	return dir
