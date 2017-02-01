@@ -21,7 +21,15 @@ func NewWally(dir string, name string) *Wally {
 		os.MkdirAll(dir, 0600)
 	}
 	path := dir + "/" + name + ".mdx"
-	masterIndex := &MasterIndex{Filename: path}
+
+	var masterIndex *MasterIndex
+
+	if _, err := os.Stat(path); err != nil {
+		masterIndex = &MasterIndex{Filename: path}
+	} else {
+		masterIndex, err = ReadMasterIndex(path)
+	}
+
 	return &Wally{Index: masterIndex, Name: name, BaseDir: dir, CurrentIndex: 0, MaxDataSize: DEFAULT_MAX_DATA_SIZE}
 }
 
