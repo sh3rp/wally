@@ -1,143 +1,114 @@
 package wally
 
 import (
-	"encoding/gob"
-	"os"
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"io/ioutil"
 )
 
-type MasterIndex struct {
-	Filename string
-	Indices  []Index
-}
+//
+// index file structure
+//
+// bits 0-32    - marker 0xDEAD
+// bits 33-64   - number of entries
+// bits 65-96   - starting offset
+// rest of bits - record locators
+//
+
+var MARKER int32 = 0xDEAD
 
 type Index struct {
-	Filename     string
-	BlobFilename string
-	StartOffset  int64
-	Records      []int64
+	StartOffset int32
+	Records     []int32
 }
 
-func WriteMasterIndex(index *MasterIndex) error {
-	f, err := os.OpenFile(index.Filename, os.O_RDWR|os.O_CREATE, 0600)
+// Write persists the index data to the file specified by filename
+func (idx *Index) Write(filename string) error {
+	buf := new(bytes.Buffer)
+
+	// write MARKER
+
+	err := binary.Write(buf, binary.LittleEndian, MARKER)
 	if err != nil {
 		return err
 	}
-	enc := gob.NewEncoder(f)
-	err = enc.Encode(index)
-	f.Close()
-	return err
-}
 
-func ReadMasterIndex(filename string) (*MasterIndex, error) {
-	f, err := os.OpenFile(filename, os.O_RDWR, 0600)
+	// write record count
 
+	err = binary.Write(buf, binary.LittleEndian, int32(len(idx.Records)))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	dec := gob.NewDecoder(f)
-	var mi MasterIndex
-	err = dec.Decode(&mi)
-	return &mi, err
-}
+	// write record starting offset
 
-func (mi *MasterIndex) LastIndex() Index {
-	var index Index
-	if len(mi.Indices) == 0 {
-		return index
+	err = binary.Write(buf, binary.LittleEndian, idx.StartOffset)
+	if err != nil {
+		return err
 	}
-	return mi.Indices[len(mi.Indices)-1]
-}
-
-func (mi *MasterIndex) WriteIndex(index Index) error {
-	var idx *Index
-	for a, i := range mi.Indices {
-		if i.Filename == index.Filename {
-			mi.Indices[a] = index
-			idx = &i
+	for _, r := range idx.Records {
+		err = binary.Write(buf, binary.LittleEndian, r)
+		if err != nil {
+			return err
 		}
 	}
-	if idx == nil {
-		mi.Indices = append(mi.Indices, index)
-		idx = &index
-	}
-	err := WriteMasterIndex(mi)
+	return ioutil.WriteFile(filename, buf.Bytes(), 0600)
+}
+
+// Read reads the index data from the file specified by filename
+func (idx *Index) Read(filename string) error {
+	b, err := ioutil.ReadFile(filename)
 
 	if err != nil {
 		return err
 	}
 
-	f, err := os.OpenFile(index.Filename, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	buf := bytes.NewReader(b)
+
+	// read marker and verify index
+
+	var marker int32
+
+	err = binary.Read(buf, binary.LittleEndian, &marker)
 
 	if err != nil {
 		return err
 	}
 
-	enc := gob.NewEncoder(f)
-	err = enc.Encode(index)
-	f.Close()
-	return err
-}
+	if marker != MARKER {
+		return errors.New("Not a Wally index")
+	}
 
-func (mi *MasterIndex) Write(index Index, data []byte) (Index, error) {
-	var idx Index
-	file, err := os.OpenFile(index.BlobFilename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0600)
-	if err != nil {
-		return idx, err
-	}
-	cursor, err := file.Seek(0, os.SEEK_END)
-	if cursor > 0 {
-		cursor++
-	}
-	if err != nil {
-		return idx, err
-	}
-	_, err = file.Write(data)
-	if err != nil {
-		return idx, err
-	}
-	file.Close()
-	index.Records = append(index.Records, cursor)
+	// read record count
 
-	mi.WriteIndex(index)
-	idx = index
-	return idx, nil
-}
-
-func (mi *MasterIndex) Read(index Index, pos int64) ([]byte, error) {
-	file, err := os.OpenFile(index.BlobFilename, os.O_RDONLY|os.O_CREATE, 0600)
+	var numRecords int32
+	err = binary.Read(buf, binary.LittleEndian, &numRecords)
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var start int64
-	if pos > 0 {
-		start, err = file.Seek(index.Records[pos]-1, 0)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		start = 0
+	idx.Records = make([]int32, numRecords)
+
+	// read starting offset
+
+	var offset int32
+	err = binary.Read(buf, binary.LittleEndian, &offset)
+
+	if err != nil {
+		return err
 	}
 
-	var end int64
-	if len(index.Records) > int(pos+1) {
-		end, err = file.Seek(index.Records[pos+1], 0)
-		if err != nil {
-			return nil, err
-		}
-		end--
-	} else {
-		stat, err := file.Stat()
-		if err != nil {
-			return nil, err
-		}
-		end = stat.Size()
+	idx.StartOffset = offset
+
+	// read in record pointers
+
+	for i := 0; i < len(idx.Records); i++ {
+		var pos int32
+		err = binary.Read(buf, binary.LittleEndian, &pos)
+		idx.Records[i] = pos
 	}
 
-	data := make([]byte, end-start)
-	_, err = file.ReadAt(data, start)
-
-	return data, err
+	return nil
 }

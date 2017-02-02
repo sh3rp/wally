@@ -9,6 +9,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTest(t *testing.T) {
+	idx := Idx{}
+	idx.Records = []int32{1, 2, 3, 4, 5}
+	idx.StartOffset = 5
+	err := idx.Write("/tmp/test.idx")
+	assert.Nil(t, err)
+	newIdx := Idx{}
+	err = newIdx.Read("/tmp/test.idx")
+	assert.Nil(t, err)
+	assert.Equal(t, idx.StartOffset, newIdx.StartOffset)
+	for a := range newIdx.Records {
+		assert.Equal(t, newIdx.Records[a], idx.Records[a])
+	}
+	os.Remove("/tmp/test.idx")
+}
+
 func TestRWMasterIndex(t *testing.T) {
 	teardown()
 	masterIdxName, idx1Name, _ := getFilenames()
